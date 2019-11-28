@@ -91,26 +91,22 @@ void compute(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz
         return;
     }
     
-    // pro vsechny body mrizky, for each point in the grid
-
+    // umisteni bodu, location of grid point
     float x = gsx * (float) i + gox;
     float y = gsy * (float) j + goy;
     float z = gsz * (float) k + goz;
-    // umisteni bodu, location of grid point
 
     float pot = 0.0f;
 
+    // pro vsechny atomy, for each atom
     for (int na = 0; na < no_atoms; na++) {
-        // pro vsechny atomy, for each atom
-    
         float dx = x - atoms[na].x;
-        float dy = y - atoms[na].y; 
+        float dy = y - atoms[na].y;
         float dz = z - atoms[na].z;
         float charge = atoms[na].charge;
 
         // atomicAdd(&gpot[(k) * gsizex * gsizey + (j) * gsizex + (i)], charge / sqrt(dx * dx + dy * dy + dz * dz));
         pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
-        // prispevek += naboj/ Eukl. vzdalenost, contribution += charge / Eucl. distance
     }
 
     gpot[k * gsizex * gsizey + j * gsizex + i] = pot;
@@ -120,10 +116,10 @@ static constexpr int block_size = 1024;
 
 void c_energy(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz, float gox, float goy, float goz, struct atom* atoms, int no_atoms, float* gpot) {
     int tot = gsizex * gsizey * gsizez;
-    // int num_blocks = (tot + block_size - 1) / block_size;
+
     dim3 grid((gsizex + 7) / 8, (gsizey + 7) / 8, (gsizez + 7) / 8);
     dim3 block_size(8, 8, 8);
-    // prispevek vsech atomu, calculate potential contribution of each atom
+
     compute<<<grid, block_size>>>(gsizex, gsizey, gsizez, gsx, gsy, gsz, gox, goy, goz, atoms, no_atoms, gpot); 
 }
 
