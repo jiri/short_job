@@ -91,33 +91,28 @@ void compute(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz
         return;
     }
     
-    // for (int i = 0; i < gsizex; i++) {
-    //     for (int j = 0; j < gsizey; j++) {
-    //         for (int k = 0; k < gsizez; k++) {
-                // pro vsechny body mrizky, for each point in the grid
+    // pro vsechny body mrizky, for each point in the grid
 
-                float x = gsx * (float) i + gox;
-                float y = gsy * (float) j + goy;
-                float z = gsz * (float) k + goz;
-                // umisteni bodu, location of grid point
+    float x = gsx * (float) i + gox;
+    float y = gsy * (float) j + goy;
+    float z = gsz * (float) k + goz;
+    // umisteni bodu, location of grid point
 
-                float pot = 0.0f;
+    float pot = 0.0f;
 
-                for (int na = 0; na < no_atoms; na++) {
-                    // pro vsechny atomy, for each atom
-                
-                    float dx = x - atoms[na].x;
-                    float dy = y - atoms[na].y; 
-                    float dz = z - atoms[na].z;
-                    float charge = atoms[na].charge;
+    for (int na = 0; na < no_atoms; na++) {
+        // pro vsechny atomy, for each atom
+    
+        float dx = x - atoms[na].x;
+        float dy = y - atoms[na].y; 
+        float dz = z - atoms[na].z;
+        float charge = atoms[na].charge;
 
-                    // atomicAdd(&gpot[(k) * gsizex * gsizey + (j) * gsizex + (i)], charge / sqrt(dx * dx + dy * dy + dz * dz));
-                    pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
-                    // prispevek += naboj/ Eukl. vzdalenost, contribution += charge / Eucl. distance
-                }
-    //         }
-    //     }
-    // }
+        // atomicAdd(&gpot[(k) * gsizex * gsizey + (j) * gsizex + (i)], charge / sqrt(dx * dx + dy * dy + dz * dz));
+        pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
+        // prispevek += naboj/ Eukl. vzdalenost, contribution += charge / Eucl. distance
+    }
+
     gpot[k * gsizex * gsizey + j * gsizex + i] = pot;
 }
 
