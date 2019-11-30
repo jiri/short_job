@@ -82,15 +82,14 @@ float body(float t,int n)
 
 __global__
 void compute(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz, float gox, float goy, float goz, struct atom* atoms, int no_atoms, float* gpot) {
+    __shared__ struct atom atomcache[1024];
+
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
-
-    // Fits in 16KB L1 Cache
-    extern __shared__ struct atom atomcache[1024];
+    int k = blockIdx.z * blockDim.z/2 + threadIdx.z/2;
     
-    int numThreads = blockDim.x * blockDim.y * blockDim.z;
-    int threadId = threadIdx.z * blockDim.y * blockDim.x + threadIdx.y * blockDim.x + threadIdx.x;
+    int numThreads = blockDim.x * blockDim.y * blockDim.z/2;
+    int threadId = threadIdx.z/2 * blockDim.y * blockDim.x + threadIdx.y * blockDim.x + threadIdx.x;
 
     // umisteni bodu, location of grid point
     float x = gsx * (float) i + gox;
@@ -99,6 +98,8 @@ void compute(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz
 
     float pot = 0.0f;
     
+    gpot[k * gsizex * gsizey + j * gsizex + i] = 0.0f;
+    
     for (int offset = 0; offset < no_atoms; offset += numThreads) {
         __syncthreads();
         if (offset + threadId < no_atoms) {
@@ -106,18 +107,30 @@ void compute(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gsz
         }
         __syncthreads();
 
-        for (int na = 0; na < min(numThreads, no_atoms - offset); na++) {
-            float dx = x - atomcache[na].x;
-            float dy = y - atomcache[na].y;
-            float dz = z - atomcache[na].z;
-            float charge = atomcache[na].charge;
-
-            pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
+        if (threadIdx.z % 2 == 0) {
+            for (int na = 0; na < min(numThreads, no_atoms - offset) / 2; na++) {
+                float dx = x - atomcache[na].x;
+                float dy = y - atomcache[na].y;
+                float dz = z - atomcache[na].z;
+                float charge = atomcache[na].charge;
+    
+                pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
+            }
+        }
+        else {
+            for (int na = min(numThreads, no_atoms - offset) / 2; na < min(numThreads, no_atoms - offset); na++) {
+                float dx = x - atomcache[na].x;
+                float dy = y - atomcache[na].y;
+                float dz = z - atomcache[na].z;
+                float charge = atomcache[na].charge;
+    
+                pot += charge / sqrt(dx * dx + dy * dy + dz * dz);
+            }
         }
     }
     
     if (i < gsizex && j < gsizey && k < gsizez) {
-        gpot[k * gsizex * gsizey + j * gsizex + i] = pot;
+        atomicAdd(&gpot[k * gsizex * gsizey + j * gsizex + i], pot);
     }
 }
 
@@ -125,10 +138,7 @@ void c_energy(int gsizex, int gsizey, int gsizez, float gsx, float gsy, float gs
     int tot = gsizex * gsizey * gsizez;
 
     dim3 grid((gsizex + 7) / 8, (gsizey + 7) / 8, (gsizez + 7) / 8);
-    dim3 block_size(8, 8, 8);
-
-    // dim3 grid((gsizex + 9) / 10, (gsizey + 9) / 10, (gsizez + 9) / 10);
-    // dim3 block_size(4, 4, 4);
+    dim3 block_size(8, 8, 16);
 
     compute<<<grid, block_size>>>(gsizex, gsizey, gsizez, gsx, gsy, gsz, gox, goy, goz, atoms, no_atoms, gpot);
     // compute<<<1, 1, 512 * sizeof(struct atom)>>>(gsizex, gsizey, gsizez, gsx, gsy, gsz, gox, goy, goz, atoms, no_atoms, gpot);
